@@ -1,0 +1,981 @@
+<title>BIOBUZZ Auto Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: workbench — field canvas on the left, tabbed control rail on the right; stacks on phones. */
+:root {
+  --bg: #f3f2ee; --panel: #fbfaf7; --ink: #1d1f22; --muted: #5e6268; --line: #d9d6cd;
+  --honey: #c98a00; --honey-soft: #f6e7bf; --red: #c8382f; --blue: #2a5bc4; --mat: #6d7178; --mat2: #62666d;
+  --good: #2f7d4f; --warn: #b4540a;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #16171a; --panel: #1e2024; --ink: #ecebe6; --muted: #a2a6ad; --line: #34373d;
+  --honey: #f0b429; --honey-soft: #3d3218; --red: #ef5b50; --blue: #6c95f0; --mat: #4a4e55; --mat2: #43474e;
+  --good: #5fc48a; --warn: #f0a050; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #16171a; --panel: #1e2024; --ink: #ecebe6; --muted: #a2a6ad; --line: #34373d;
+  --honey: #f0b429; --honey-soft: #3d3218; --red: #ef5b50; --blue: #6c95f0; --mat: #4a4e55; --mat2: #43474e;
+  --good: #5fc48a; --warn: #f0a050; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 32px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; max-width: 1280px; margin: 0 auto 14px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: .01em; margin: 0; text-wrap: balance }
+h1 span { color: var(--honey) }
+.sub { color: var(--muted); max-width: 70ch; margin: 0 }
+.wrap { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr) } }
+.fieldcol { display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+canvas#field { width: 100%; max-width: 100%; aspect-ratio: 1 / 1; display: block; border-radius: 6px; background: var(--mat); touch-action: none; cursor: grab }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px }
+.timeline { position: relative; height: 26px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow: hidden; flex: 1 1 240px; min-width: 0 }
+.timeline .seg { position: absolute; top: 0; bottom: 0; border-right: 1px solid var(--bg) }
+.timeline .limit { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red) }
+.timeline .head { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink) }
+input[type=range]#scrub { flex: 1 1 200px; min-width: 0; accent-color: var(--honey) }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px }
+@media (max-width: 520px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0 }
+.stat b { display: block; font-family: var(--display); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1 }
+.stat small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em }
+.stat.over b { color: var(--red) } .stat.ok b { color: var(--good) }
+.warns { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none }
+.warns li { border-left: 3px solid var(--warn); padding: 4px 8px; background: var(--panel); font-size: 13px }
+.rail { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 0; display: flex; flex-direction: column }
+.tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto }
+.tabs button { flex: 1 0 auto; background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 12px; font: 600 15px var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); cursor: pointer }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--honey) }
+.pane[hidden] { display: none }
+.pane { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.pane h3 { font: 600 17px var(--display); letter-spacing: .03em; margin: 4px 0 0; text-transform: uppercase }
+.pane p { margin: 0; color: var(--muted); font-size: 13px; max-width: 65ch }
+button, select, input { font: inherit; color: inherit }
+.btn { background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; cursor: pointer; white-space: nowrap }
+.btn:hover { border-color: var(--honey) }
+.btn.primary { background: var(--honey); border-color: var(--honey); color: #1d1f22; font-weight: 600 }
+.btn:focus-visible, select:focus-visible, input:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px }
+.steps { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none }
+.step { display: grid; grid-template-columns: 22px 92px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg) }
+.step.active { border-color: var(--honey); box-shadow: inset 3px 0 0 var(--honey) }
+.step .n { font: 500 12px var(--mono); color: var(--muted); text-align: right }
+.step .params { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0 }
+.step .params label { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted) }
+.step input[type=number] { width: 64px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); font-family: var(--mono); font-size: 12.5px }
+.step select, .grid select { padding: 3px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel) }
+.step .ops { display: flex; gap: 2px }
+.step .ops button { background: none; border: 1px solid transparent; border-radius: 4px; padding: 2px 5px; cursor: pointer; color: var(--muted); font-size: 13px }
+.step .ops button:hover { border-color: var(--line); color: var(--ink) }
+.step .t { font-family: var(--mono); font-size: 11px; color: var(--muted); grid-column: 2 / -1 }
+@media (max-width: 520px) { .step { grid-template-columns: 22px minmax(0, 1fr) auto } .step .params { grid-column: 2 / -1 } }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px }
+.grid label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); min-width: 0 }
+.grid input[type=number], .grid input[type=text] { padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-family: var(--mono); font-size: 13px; width: 100%; min-width: 0 }
+.grid .full { grid-column: 1 / -1 }
+pre.code { margin: 0; max-height: 340px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 12px/1.45 var(--mono); white-space: pre }
+textarea { width: 100%; min-height: 80px; font: 12px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; color: var(--ink) }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px }
+.tag { overflow-wrap: anywhere; font: 500 11px var(--mono); padding: 1px 6px; border-radius: 3px; background: var(--honey-soft); color: var(--ink) }
+.fieldrow { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)); gap: 6px; align-items: center; font-size: 12px }
+.fieldrow input { width: 100%; padding: 3px 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); font-family: var(--mono); font-size: 12px; min-width: 0 }
+.note { border-left: 3px solid var(--honey); padding: 6px 10px; background: var(--honey-soft); font-size: 13px; border-radius: 0 4px 4px 0 }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto } }
+</style>
+
+<header>
+  <h1>BIOBUZZ <span>Auto Lab</span></h1>
+  <p class="sub">Plan a 30-second AUTO for the goBILDA 6WD drop-center StarterBot, see how far it can drift, and export the same plan as a Java OpMode. Drag the robot to set its start pose.</p>
+</header>
+
+<div class="wrap">
+  <section class="fieldcol" aria-label="Field simulation">
+    <canvas id="field" width="900" height="900" aria-label="BIOBUZZ field with the simulated robot path"></canvas>
+    <div class="bar">
+      <button class="btn primary" id="play" type="button">Play</button>
+      <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub through the plan">
+      <select id="speed" aria-label="Playback speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <label class="legend"><input type="checkbox" id="ghosts" checked> Drift cloud</label>
+    </div>
+    <div class="bar"><div class="timeline" id="timeline" aria-hidden="true"></div></div>
+    <div class="stats">
+      <div class="stat" id="st-time"><small>Plan time</small><b>–</b></div>
+      <div class="stat" id="st-pts"><small>Est. points</small><b>–</b></div>
+      <div class="stat" id="st-r95"><small>End spread (95%)</small><b>–</b></div>
+      <div class="stat" id="st-head"><small>Heading spread, 1 sd</small><b>–</b></div>
+    </div>
+    <ul class="warns" id="warns"></ul>
+    <div class="legend">
+      <span><i style="background:var(--honey)"></i>Planned path</span>
+      <span><i style="background:var(--ink);opacity:.35"></i>60 noisy runs (end poses)</span>
+      <span><i style="background:var(--red)"></i>Red alliance</span>
+      <span><i style="background:var(--blue)"></i>Blue alliance</span>
+    </div>
+  </section>
+
+  <section class="rail" aria-label="Controls">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="plan" id="tab-plan">Plan</button>
+      <button role="tab" aria-selected="false" data-tab="robot" id="tab-robot">Robot</button>
+      <button role="tab" aria-selected="false" data-tab="fieldp" id="tab-fieldp">Field</button>
+      <button role="tab" aria-selected="false" data-tab="cal" id="tab-cal">Calibrate</button>
+      <button role="tab" aria-selected="false" data-tab="export" id="tab-export">Export</button>
+    </div>
+
+    <div class="pane" data-pane="plan">
+      <div class="grid">
+        <label>Start x (in)<input type="number" id="sx" step="0.5"></label>
+        <label>Start y (in)<input type="number" id="sy" step="0.5"></label>
+        <label>Start heading (°, 0 = away from audience)<input type="number" id="sh" step="1"></label>
+        <label>Snap start to tile center<select id="snap"><option value="1">On</option><option value="0">Off</option></select></label>
+      </div>
+      <ol class="steps" id="steps"></ol>
+      <div class="bar">
+        <button class="btn" type="button" data-add="drive">+ Drive</button>
+        <button class="btn" type="button" data-add="turn">+ Turn</button>
+        <button class="btn" type="button" data-add="square">+ Square on wall</button>
+        <button class="btn" type="button" data-add="launch">+ Launch</button>
+        <button class="btn" type="button" data-add="intake">+ Intake</button>
+        <button class="btn" type="button" data-add="wait">+ Wait</button>
+      </div>
+      <p><b>Drive</b> is inches along the robot's heading (negative = reverse) with a trapezoid speed profile and IMU heading hold. <b>Turn</b> uses the Control Hub IMU. <b>Square on wall</b> drives into the perimeter at low power and resets heading to the wall, which is how an AUTO without odometry removes accumulated error.</p>
+      <p class="tag" style="align-self:flex-start">The loaded plan is an example. Replace it with your own.</p>
+    </div>
+
+    <div class="pane" data-pane="robot" hidden>
+      <p>Defaults are goBILDA StarterBot parts: 312 RPM Yellow Jacket motors (537.7 ticks/rev) on 104 mm wheels. Check them against your build, then replace the starred values with calibration results.</p>
+      <div class="grid" id="robotGrid"></div>
+      <p id="robotDerived" class="tag" style="align-self:flex-start"></p>
+    </div>
+
+    <div class="pane" data-pane="fieldp" hidden>
+      <div class="note">The element positions below are approximations built from the manual's dimensions. Load the official field drawing (Competition Manual Figure 9-2 / Field Setup Guide) as a background, then drag each element until it lines up.</div>
+      <div class="bar">
+        <label class="btn" for="bgfile">Load field image…</label>
+        <input type="file" id="bgfile" accept="image/*" hidden>
+        <label class="legend">Opacity <input type="range" id="bgop" min="0" max="100" value="55"></label>
+        <label class="legend"><input type="checkbox" id="editField"> Drag elements on the field</label>
+      </div>
+      <div class="fieldrow" style="color:var(--muted)"><span>Element</span><span>x</span><span>y</span><span>w</span><span>h</span></div>
+      <div id="fieldList" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button class="btn" type="button" id="resetField" style="align-self:flex-start">Reset field to defaults</button>
+    </div>
+
+    <div class="pane" data-pane="cal" hidden>
+      <p>The simulator only predicts the real robot once these numbers come from your robot. Export <span class="tag">AutoLabCalibration.java</span>, run each test on a real field tile, and type in what you measured.</p>
+      <h3>1 · Straight 72 in (button A)</h3>
+      <div class="grid">
+        <label>Encoder inches shown<input type="number" id="c-enc" step="0.01" placeholder="e.g. 72.00"></label>
+        <label>Tape-measured inches<input type="number" id="c-tape" step="0.1" placeholder="e.g. 70.6"></label>
+        <label class="full">Heading drift shown (°)<input type="number" id="c-drift" step="0.1" placeholder="e.g. 1.8"></label>
+      </div>
+      <h3>2 · Spin 360° (button B)</h3>
+      <div class="grid"><label class="full">Suggested TRACK_EFF shown (in)<input type="number" id="c-track" step="0.01"></label></div>
+      <h3>3 · Sprint (button X)</h3>
+      <div class="grid">
+        <label>Peak velocity (in/s)<input type="number" id="c-vel" step="0.1"></label>
+        <label>Approx accel (in/s²)<input type="number" id="c-acc" step="1"></label>
+      </div>
+      <h3>4 · Repeatability</h3>
+      <p>Run your AUTO on the real robot 5+ times from the same start. Measure how far apart the end positions land. Auto Lab scales the error model until its drift cloud matches.</p>
+      <div class="grid"><label class="full">Real 95% end spread (in)<input type="number" id="c-r95" step="0.1"></label></div>
+      <div class="bar"><button class="btn primary" type="button" id="applyCal">Apply to robot model</button><span id="calMsg" class="legend"></span></div>
+    </div>
+
+    <div class="pane" data-pane="export" hidden>
+      <p>Both files use the robot model above. Copy them into <span class="tag">TeamCode/src/main/java/org/firstinspires/ftc/teamcode/</span>. Wire <code>setIntake</code> and <code>launch</code> to the goBILDA example code, keeping launch time equal to the sim's.</p>
+      <div class="bar"><h3 style="flex:1">BiobuzzAutoLab.java</h3><button class="btn" type="button" data-copy="javaAuto">Copy</button></div>
+      <pre class="code" id="javaAuto"></pre>
+      <div class="bar"><h3 style="flex:1">AutoLabCalibration.java</h3><button class="btn" type="button" data-copy="javaCal">Copy</button></div>
+      <pre class="code" id="javaCal"></pre>
+      <div class="bar"><h3 style="flex:1">Plan file (JSON)</h3><button class="btn" type="button" data-copy="planJson">Copy</button></div>
+      <pre class="code" id="planJson" style="max-height:160px"></pre>
+      <label class="legend" for="importBox">Paste a plan file to load it</label>
+      <textarea id="importBox" placeholder='{"start":{...},"plan":[...],"robot":{...}}'></textarea>
+      <div class="bar"><button class="btn" type="button" id="importBtn">Load pasted plan</button><span id="copyMsg" class="legend" aria-live="polite"></span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// BIOBUZZ Auto Lab core: robot model, simulator, Monte Carlo, Java generator.
+// Units: inches, seconds, degrees. Field origin = field center, +x = right, +y = away from audience.
+// Heading 0 = robot facing +y, positive = counter-clockwise (matches Control Hub IMU yaw).
+const CORE = (() => {
+  const FIELD = 144, HALF = 72;
+
+  const DEFAULT_ROBOT = {
+    wheelDiaIn: 4.094,        // 104 mm wheel
+    motorRpm: 312,            // goBILDA 5203 19.2:1
+    ticksPerRev: 537.7,
+    gearRatio: 1.0,           // wheel turns per motor turn
+    efficiency: 0.85,         // fraction of free speed reached under load
+    maxAccel: 60,             // in/s^2
+    trackEff: 16.0,           // effective track width (calibrate: 6WD scrub makes it > measured)
+    lengthIn: 18, widthIn: 18,
+    distScale: 1.0,           // calibration multiplier on encoder distance
+    launchSpinupS: 0.8, launchPerPieceS: 0.35,
+    // error model (1 sigma)
+    distErrPct: 1.5, driftDegPerIn: 0.02, turnErrDeg: 1.0, turnByImu: true,
+    leftNames: "left_drive", rightNames: "right_drive", leftReversed: true,
+    hubLogo: "UP", hubUsb: "FORWARD",
+  };
+
+  const vFree = r => r.motorRpm / 60 * r.gearRatio * Math.PI * r.wheelDiaIn;
+  const vMax = r => vFree(r) * r.efficiency;
+
+  // time & position for a trapezoidal profile
+  function trap(d, v, a) {
+    d = Math.abs(d);
+    if (d === 0) return { T: 0, s: () => 0 };
+    const dAcc = v * v / a;
+    if (d <= dAcc) {
+      const tp = Math.sqrt(d / a), T = 2 * tp;
+      return { T, s: t => t <= 0 ? 0 : t >= T ? d : t < tp ? 0.5 * a * t * t : d - 0.5 * a * (T - t) ** 2 };
+    }
+    const ta = v / a, T = d / v + ta;
+    return { T, s: t => t <= 0 ? 0 : t >= T ? d : t < ta ? 0.5 * a * t * t : t < T - ta ? 0.5 * a * ta * ta + v * (t - ta) : d - 0.5 * a * (T - t) ** 2 };
+  }
+
+  const norm = h => { h = ((h + 180) % 360 + 360) % 360 - 180; return h === -180 ? 180 : h; };
+  const fwd = h => { const r = h * Math.PI / 180; return [-Math.sin(r), Math.cos(r)]; };
+
+  function gauss(rng) { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  // robot footprint corners
+  function corners(p, r) {
+    const [fx, fy] = fwd(p.h), sx = fy, sy = -fx, L = r.lengthIn / 2, W = r.widthIn / 2;
+    return [[L, W], [L, -W], [-L, -W], [-L, W]].map(([a, b]) => [p.x + fx * a + sx * b, p.y + fy * a + sy * b]);
+  }
+
+  // distance robot can move along dir before footprint hits the perimeter
+  function distToWall(p, r, dirSign) {
+    const [fx, fy] = fwd(p.h); let best = Infinity;
+    for (const [cx, cy] of corners(p, r)) {
+      const dx = fx * dirSign, dy = fy * dirSign;
+      if (dx > 1e-9) best = Math.min(best, (HALF - cx) / dx);
+      if (dx < -1e-9) best = Math.min(best, (-HALF - cx) / dx);
+      if (dy > 1e-9) best = Math.min(best, (HALF - cy) / dy);
+      if (dy < -1e-9) best = Math.min(best, (-HALF - cy) / dy);
+    }
+    return Math.max(0, best);
+  }
+
+  // Simulate a plan. noise: null for nominal, or rng for a perturbed run.
+  function simulate(plan, r, start, rng) {
+    const segs = []; let p = { ...start }, t = 0, heldHeading = start.h, launched = 0, intake = false;
+    const v0 = vMax(r), a = r.maxAccel;
+    const n = () => rng ? gauss(rng) : 0;
+    for (let i = 0; i < plan.length; i++) {
+      const s = plan[i], from = { ...p };
+      if (s.t === "drive") {
+        const pw = Math.min(1, Math.max(0.05, s.p ?? 0.8)), prof = trap(s.in, v0 * pw, a), sign = Math.sign(s.in) || 1;
+        const actual = Math.abs(s.in) * (1 + n() * r.distErrPct / 100);
+        const drift = n() * r.driftDegPerIn * Math.sqrt(Math.abs(s.in)) * Math.sqrt(Math.abs(s.in));
+        const T = prof.T, k = Math.abs(s.in) ? actual / Math.abs(s.in) : 1;
+        const pose = tt => { const d = prof.s(tt) * k, f = Math.abs(s.in) ? d / actual : 0, hh = from.h + drift * f;
+          const [fx, fy] = fwd((from.h + hh) / 2); return { x: from.x + fx * d * sign, y: from.y + fy * d * sign, h: hh }; };
+        p = pose(T); segs.push({ i, t0: t, T, pose, kind: "drive" }); t += T;
+      } else if (s.t === "turn") {
+        const target = s.abs ? s.deg : heldHeading + s.deg;
+        const delta = s.abs ? norm(target - p.h) : s.deg; // relative turns keep their sign/size (can exceed 180)
+        const pw = Math.min(1, Math.max(0.05, s.p ?? 0.6)), wheelV = v0 * pw;
+        const prof = trap(delta * Math.PI / 180 * r.trackEff / 2, wheelV, a);
+        const err = n() * (r.turnByImu ? r.turnErrDeg : r.turnErrDeg * 4);
+        const endH = r.turnByImu ? target + err : p.h + delta + err;
+        const dh = endH - from.h, len = Math.abs(delta * Math.PI / 180 * r.trackEff / 2) || 1;
+        const pose = tt => ({ x: from.x, y: from.y, h: from.h + dh * prof.s(tt) / len });
+        heldHeading = target; p = pose(prof.T); segs.push({ i, t0: t, T: prof.T, pose, kind: "turn" }); t += prof.T;
+      } else if (s.t === "square") {
+        const dir = s.dir === "fwd" ? 1 : -1, pw = Math.min(1, Math.max(0.05, s.p ?? 0.3));
+        const dmax = (v0 * pw) * (s.ms / 1000), dw = distToWall(p, r, dir), d = Math.min(dmax, dw);
+        const prof = trap(d, v0 * pw, a), T = Math.max(prof.T, s.ms / 1000), hit = dw <= dmax;
+        const snapH = Math.round(p.h / 90) * 90, snap = hit && Math.abs(norm(p.h - snapH)) < 20;
+        const pose = tt => { const dd = prof.s(Math.min(tt, prof.T)), [fx, fy] = fwd(from.h);
+          let q = { x: from.x + fx * dd * dir, y: from.y + fy * dd * dir, h: from.h };
+          if (snap && tt >= prof.T) { q.h = snapH; } return q; };
+        p = pose(T);
+        if (snap) { // wall contact removes heading error and the coordinate normal to the wall
+          const c = corners(p, r), xs = c.map(v => v[0]), ys = c.map(v => v[1]);
+          if (Math.max(...xs) > HALF) p.x -= Math.max(...xs) - HALF; if (Math.min(...xs) < -HALF) p.x += -HALF - Math.min(...xs);
+          if (Math.max(...ys) > HALF) p.y -= Math.max(...ys) - HALF; if (Math.min(...ys) < -HALF) p.y += -HALF - Math.min(...ys);
+          heldHeading = snapH;
+        }
+        const end = { ...p }; segs.push({ i, t0: t, T, pose: tt => tt >= T ? end : pose(tt), kind: "square", hit, snap }); t += T;
+      } else if (s.t === "wait") {
+        const T = (s.ms || 0) / 1000, q = { ...p }; segs.push({ i, t0: t, T, pose: () => q, kind: "wait" }); t += T;
+      } else if (s.t === "intake") {
+        intake = !!s.on; const q = { ...p }; segs.push({ i, t0: t, T: 0, pose: () => q, kind: "intake" });
+      } else if (s.t === "launch") {
+        const T = r.launchSpinupS + r.launchPerPieceS * (s.n || 0), q = { ...p }; launched += s.n || 0;
+        segs.push({ i, t0: t, T, pose: () => q, kind: "launch", n: s.n }); t += T;
+      }
+    }
+    return { segs, end: p, T: t, launched, intake };
+  }
+
+  function poseAt(sim, tt, start) {
+    if (!sim.segs.length) return start;
+    for (const s of sim.segs) if (tt <= s.t0 + s.T) return s.pose(Math.max(0, tt - s.t0));
+    return sim.end;
+  }
+
+  function monteCarlo(plan, r, start, N = 60, seed = 7) {
+    const rng = mulberry(seed), ends = [];
+    for (let k = 0; k < N; k++) ends.push(simulate(plan, r, start, rng).end);
+    const mx = ends.reduce((a, e) => a + e.x, 0) / N, my = ends.reduce((a, e) => a + e.y, 0) / N;
+    const r95 = Math.sqrt(ends.map(e => (e.x - mx) ** 2 + (e.y - my) ** 2).sort((a, b) => a - b)[Math.floor(N * 0.95) - 1]);
+    const hs = ends.map(e => e.h), mh = hs.reduce((a, b) => a + b, 0) / N;
+    const sh = Math.sqrt(hs.reduce((a, b) => a + (b - mh) ** 2, 0) / N);
+    return { ends, r95, sh };
+  }
+
+  // checks along the nominal path
+  function checks(sim, r, start, zones) {
+    const warn = [], step = 0.05; let wall = false, hive = false;
+    const H = zones.hive;
+    for (let tt = 0; tt <= sim.T + 1e-9; tt += step) {
+      const seg = sim.segs.find(g => tt >= g.t0 && tt <= g.t0 + g.T);
+      const p = poseAt(sim, tt, start), c = corners(p, r);
+      if (seg && seg.kind === "square") continue;   // wall contact is the point of a square step
+      if (c.some(([x, y]) => Math.abs(x) > HALF + 0.5 || Math.abs(y) > HALF + 0.5)) wall = true;
+      if (H && c.some(([x, y]) => Math.abs(x - H.x) < H.w / 2 && Math.abs(y - H.y) < H.h / 2)) hive = true;
+    }
+    if (wall) warn.push("Robot runs into the field wall on the nominal path. Use a Square step if that's intended.");
+    if (hive) warn.push("Robot footprint overlaps the HIVE frame.");
+    if (sim.T > 30) warn.push(`Plan takes ${sim.T.toFixed(1)} s, over the 30 s AUTO period.`);
+    return warn;
+  }
+
+  function inRect(pt, z) { return Math.abs(pt[0] - z.x) <= z.w / 2 && Math.abs(pt[1] - z.y) <= z.h / 2; }
+  function score(sim, r, start, zones) {
+    const c0 = corners(start, r), c1 = corners(sim.end, r);
+    // LEAVE: approximated as fully leaving the starting tile footprint
+    const startBox = { x: start.x, y: start.y, w: 24, h: 24 };
+    const leave = !c1.some(pt => inRect(pt, startBox)) || Math.hypot(sim.end.x - start.x, sim.end.y - start.y) >= 24;
+    const park = zones.park ? c1.every(pt => inRect(pt, zones.park)) : false;
+    return { leave, park, launched: sim.launched, pts: (leave ? 3 : 0) + (park ? 5 : 0) + 2 * sim.launched };
+  }
+
+  // ---------- Java generation ----------
+  const f = (x, d = 3) => Number(x).toFixed(d);
+  const names = s => s.split(",").map(x => x.trim()).filter(Boolean);
+  function stepJava(s) {
+    switch (s.t) {
+      case "drive": return `drive(${f(s.in, 2)}, ${f(s.p ?? 0.8, 2)});`;
+      case "turn": return s.abs ? `turnTo(${f(s.deg, 1)}, ${f(s.p ?? 0.6, 2)});` : `turnBy(${f(s.deg, 1)}, ${f(s.p ?? 0.6, 2)});`;
+      case "square": return `squareOnWall(${s.dir === "fwd" ? 1 : -1}, ${f(s.p ?? 0.3, 2)}, ${Math.round(s.ms)});`;
+      case "wait": return `sleep(${Math.round(s.ms)});`;
+      case "intake": return `setIntake(${s.on ? "true" : "false"});`;
+      case "launch": return `launch(${s.n | 0});`;
+    }
+    return "";
+  }
+
+  function javaAuto(plan, r, start, className = "BiobuzzAutoLab") {
+    const L = names(r.leftNames), R = names(r.rightNames);
+    const steps = plan.map(s => "        " + stepJava(s) + (s.note ? "  // " + s.note.replace(/[\r\n]/g, " ") : "")).join("\n");
+    return `package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
+/**
+ * Generated by BIOBUZZ Auto Lab for the goBILDA 6WD drop-center StarterBot.
+ * The constants below are the same numbers the simulator used, so the real robot runs
+ * the same velocity profiles, turns and wall squares you planned. Re-export after you
+ * change anything in the Robot panel or after calibration.
+ *
+ * Start pose in the sim: x=${f(start.x, 1)} in, y=${f(start.y, 1)} in, heading=${f(start.h, 1)} deg.
+ * Simulated duration: see Auto Lab. Mechanisms (intake/launch) are stubs: wire them to the
+ * goBILDA example code.
+ */
+@Autonomous(name = "BIOBUZZ Auto Lab", group = "Auto Lab")
+public class ${className} extends LinearOpMode {
+
+    // ---- Robot model (keep identical to Auto Lab) ----
+    static final double WHEEL_DIAMETER_IN = ${f(r.wheelDiaIn, 4)};
+    static final double TICKS_PER_REV     = ${f(r.ticksPerRev, 2)};
+    static final double GEAR_RATIO        = ${f(r.gearRatio, 4)};   // wheel turns per motor turn
+    static final double DIST_SCALE        = ${f(r.distScale, 4)};   // from calibration
+    static final double MAX_VEL_IN_S      = ${f(vMax(r), 2)};       // ${f(r.efficiency * 100, 0)}% of free speed
+    static final double MAX_ACCEL_IN_S2   = ${f(r.maxAccel, 1)};
+    static final double TRACK_EFF_IN      = ${f(r.trackEff, 2)};
+    static final double START_HEADING_DEG = ${f(start.h, 1)};
+    static final double LAUNCH_SPINUP_S   = ${f(r.launchSpinupS, 2)};
+    static final double LAUNCH_PER_PIECE_S = ${f(r.launchPerPieceS, 2)};
+
+    static final double TICKS_PER_IN = TICKS_PER_REV / (GEAR_RATIO * Math.PI * WHEEL_DIAMETER_IN) * DIST_SCALE;
+    static final double HEADING_KP = 0.03;   // per degree, heading hold while driving
+    static final double TURN_KP = 0.012;     // per degree
+    static final double TURN_TOL_DEG = 1.0;
+
+    private DcMotorEx[] left, right;
+    private IMU imu;
+    private double headingOffset = 0, targetHeading = START_HEADING_DEG;
+    private final ElapsedTime matchTimer = new ElapsedTime();
+
+    @Override
+    public void runOpMode() {
+        left = new DcMotorEx[]{${L.map(n => `hardwareMap.get(DcMotorEx.class, "${n}")`).join(", ")}};
+        right = new DcMotorEx[]{${R.map(n => `hardwareMap.get(DcMotorEx.class, "${n}")`).join(", ")}};
+        for (DcMotorEx m : left) m.setDirection(${r.leftReversed ? "DcMotorSimple.Direction.REVERSE" : "DcMotorSimple.Direction.FORWARD"});
+        for (DcMotorEx m : right) m.setDirection(${r.leftReversed ? "DcMotorSimple.Direction.FORWARD" : "DcMotorSimple.Direction.REVERSE"});
+        for (DcMotorEx m : all()) {
+            m.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            m.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            m.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+        imu = hardwareMap.get(IMU.class, "imu");
+        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.${r.hubLogo},
+                RevHubOrientationOnRobot.UsbFacingDirection.${r.hubUsb})));
+        initMechanisms();
+
+        telemetry.addLine("BIOBUZZ Auto Lab ready");
+        telemetry.update();
+        waitForStart();
+        imu.resetYaw();
+        headingOffset = START_HEADING_DEG;
+        targetHeading = START_HEADING_DEG;
+        matchTimer.reset();
+
+        // ---- Plan (generated) ----
+${steps}
+
+        stopDrive();
+        telemetry.addData("Auto done in", "%.1f s", matchTimer.seconds());
+        telemetry.update();
+        while (opModeIsActive()) idle();
+    }
+
+    // ===================== Mechanisms: wire to goBILDA example code =====================
+    private void initMechanisms() {
+        // TODO: hardwareMap the intake and launcher exactly like the goBILDA StarterBot example code.
+    }
+
+    private void setIntake(boolean on) {
+        // TODO: intake motor power on/off.
+    }
+
+    /** Fires n POLLEN. Keep the total time equal to LAUNCH_SPINUP_S + n * LAUNCH_PER_PIECE_S so sim timing matches. */
+    private void launch(int n) {
+        ElapsedTime t = new ElapsedTime();
+        // TODO: spin up the launcher, feed n pieces, spin down.
+        while (opModeIsActive() && t.seconds() < LAUNCH_SPINUP_S + n * LAUNCH_PER_PIECE_S) idle();
+    }
+
+    // ===================== Drive primitives (match the simulator) =====================
+    private DcMotorEx[] all() {
+        DcMotorEx[] a = new DcMotorEx[left.length + right.length];
+        System.arraycopy(left, 0, a, 0, left.length);
+        System.arraycopy(right, 0, a, left.length, right.length);
+        return a;
+    }
+
+    private double heading() {
+        return wrap(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES) + headingOffset);
+    }
+
+    private static double wrap(double d) {
+        while (d > 180) d -= 360;
+        while (d <= -180) d += 360;
+        return d;
+    }
+
+    private double leftInches() { double s = 0; for (DcMotorEx m : left) s += m.getCurrentPosition(); return s / left.length / TICKS_PER_IN; }
+    private double rightInches() { double s = 0; for (DcMotorEx m : right) s += m.getCurrentPosition(); return s / right.length / TICKS_PER_IN; }
+
+    private void setWheelVel(double leftInS, double rightInS) {
+        for (DcMotorEx m : left) m.setVelocity(leftInS * TICKS_PER_IN);
+        for (DcMotorEx m : right) m.setVelocity(rightInS * TICKS_PER_IN);
+    }
+
+    private void stopDrive() { setWheelVel(0, 0); }
+
+    /** Trapezoidal-profile drive with IMU heading hold. Positive inches = forward. */
+    private void drive(double inches, double power) {
+        double vmax = MAX_VEL_IN_S * Range.clip(power, 0.05, 1.0);
+        double dist = Math.abs(inches), sign = Math.signum(inches);
+        double l0 = leftInches(), r0 = rightInches();
+        ElapsedTime t = new ElapsedTime();
+        double timeout = dist / vmax + vmax / MAX_ACCEL_IN_S2 + 1.5;
+        while (opModeIsActive() && t.seconds() < timeout) {
+            double traveled = Math.abs(((leftInches() - l0) + (rightInches() - r0)) / 2);
+            double remaining = dist - traveled;
+            if (remaining <= 0.25) break;
+            double v = Math.min(vmax, Math.min(MAX_ACCEL_IN_S2 * t.seconds() + 4.0, Math.sqrt(2 * MAX_ACCEL_IN_S2 * remaining) + 1.0));
+            double corr = HEADING_KP * wrap(targetHeading - heading()) * vmax;
+            setWheelVel(sign * v - corr, sign * v + corr);
+            idle();
+        }
+        stopDrive();
+    }
+
+    private void turnTo(double headingDeg, double power) {
+        targetHeading = wrap(headingDeg);
+        double wmax = MAX_VEL_IN_S * Range.clip(power, 0.05, 1.0);
+        ElapsedTime t = new ElapsedTime();
+        int settled = 0;
+        while (opModeIsActive() && t.seconds() < 4.0) {
+            double err = wrap(targetHeading - heading());
+            if (Math.abs(err) < TURN_TOL_DEG) { if (++settled >= 5) break; } else settled = 0;
+            double ramp = Math.min(1.0, MAX_ACCEL_IN_S2 * t.seconds() / wmax + 0.15);
+            double v = Range.clip(TURN_KP * err * MAX_VEL_IN_S, -wmax, wmax) * ramp;
+            if (Math.abs(v) < 3.0 && Math.abs(err) >= TURN_TOL_DEG) v = Math.signum(err) * 3.0;
+            setWheelVel(-v, v);   // CCW positive
+            idle();
+        }
+        stopDrive();
+    }
+
+    private void turnBy(double deg, double power) { turnTo(targetHeading + deg, power); }
+
+    /** Drive into a wall at low power for ms, then trust the wall: snap heading to the nearest 90 deg. */
+    private void squareOnWall(int dir, double power, long ms) {
+        ElapsedTime t = new ElapsedTime();
+        double v = dir * MAX_VEL_IN_S * Range.clip(power, 0.05, 1.0);
+        while (opModeIsActive() && t.milliseconds() < ms) { setWheelVel(v, v); idle(); }
+        stopDrive();
+        sleep(100);
+        double h = heading();
+        double snap = Math.round(h / 90.0) * 90.0;
+        if (Math.abs(wrap(h - snap)) < 20) { headingOffset += wrap(snap - h); targetHeading = snap; }
+    }
+}
+`;
+  }
+
+  function javaCalibration(r) {
+    const L = names(r.leftNames), R = names(r.rightNames);
+    return `package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
+/**
+ * BIOBUZZ Auto Lab calibration. Run each test, measure with a tape, and type the results
+ * into the Calibrate panel in Auto Lab. Gamepad1: A = 72 in straight, B = 4 x 90 deg spin
+ * using encoders only (for track width), X = full-power sprint for max velocity / accel.
+ */
+@Autonomous(name = "Auto Lab Calibration", group = "Auto Lab")
+public class AutoLabCalibration extends LinearOpMode {
+    static final double WHEEL_DIAMETER_IN = ${f(r.wheelDiaIn, 4)};
+    static final double TICKS_PER_REV = ${f(r.ticksPerRev, 2)};
+    static final double GEAR_RATIO = ${f(r.gearRatio, 4)};
+    static final double TICKS_PER_IN = TICKS_PER_REV / (GEAR_RATIO * Math.PI * WHEEL_DIAMETER_IN);
+    static final double TRACK_GUESS_IN = ${f(r.trackEff, 2)};
+
+    DcMotorEx[] left, right;
+    IMU imu;
+
+    @Override
+    public void runOpMode() {
+        left = new DcMotorEx[]{${L.map(n => `hardwareMap.get(DcMotorEx.class, "${n}")`).join(", ")}};
+        right = new DcMotorEx[]{${R.map(n => `hardwareMap.get(DcMotorEx.class, "${n}")`).join(", ")}};
+        for (DcMotorEx m : left) m.setDirection(${r.leftReversed ? "DcMotorSimple.Direction.REVERSE" : "DcMotorSimple.Direction.FORWARD"});
+        for (DcMotorEx m : right) m.setDirection(${r.leftReversed ? "DcMotorSimple.Direction.FORWARD" : "DcMotorSimple.Direction.REVERSE"});
+        for (DcMotorEx m : left) prep(m);
+        for (DcMotorEx m : right) prep(m);
+        imu = hardwareMap.get(IMU.class, "imu");
+        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.${r.hubLogo},
+                RevHubOrientationOnRobot.UsbFacingDirection.${r.hubUsb})));
+        waitForStart();
+        while (opModeIsActive()) {
+            telemetry.addLine("A: drive 72 in   B: spin 360 deg (encoders)   X: sprint");
+            telemetry.addData("Encoder inches L/R", "%.2f / %.2f", in(left), in(right));
+            telemetry.addData("IMU yaw", "%.2f", imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
+            telemetry.update();
+            if (gamepad1.a) straight72();
+            if (gamepad1.b) spin360();
+            if (gamepad1.x) sprint();
+            idle();
+        }
+    }
+
+    void prep(DcMotorEx m) {
+        m.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        m.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        m.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+
+    double in(DcMotorEx[] side) { double s = 0; for (DcMotorEx m : side) s += m.getCurrentPosition(); return s / side.length / TICKS_PER_IN; }
+    void vel(double l, double r) { for (DcMotorEx m : left) m.setVelocity(l * TICKS_PER_IN); for (DcMotorEx m : right) m.setVelocity(r * TICKS_PER_IN); }
+
+    /** Measure the real distance with a tape. DIST_SCALE = (encoder inches shown) / (tape inches). */
+    void straight72() {
+        imu.resetYaw();
+        double l0 = in(left), r0 = in(right);
+        while (opModeIsActive() && ((in(left) - l0) + (in(right) - r0)) / 2 < 72) vel(20, 20);
+        vel(0, 0);
+        sleep(500);
+        double enc = ((in(left) - l0) + (in(right) - r0)) / 2;
+        double drift = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        report("Straight: encoder in", enc, "Heading drift deg", drift);
+    }
+
+    /** Spin until encoders say 360 deg at TRACK_GUESS. TRACK_EFF = TRACK_GUESS * 360 / (IMU degrees turned). */
+    void spin360() {
+        imu.resetYaw();
+        double l0 = in(left), r0 = in(right), arc = Math.PI * TRACK_GUESS_IN;
+        double turned = 0, last = 0;
+        while (opModeIsActive() && ((in(right) - r0) - (in(left) - l0)) / 2 < arc) {
+            vel(-12, 12);
+            double y = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+            double d = y - last; if (d < -180) d += 360; if (d > 180) d -= 360;
+            turned += d; last = y;
+        }
+        vel(0, 0);
+        sleep(500);
+        double y = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        double d = y - last; if (d < -180) d += 360; if (d > 180) d -= 360; turned += d;
+        report("Spin: IMU degrees", turned, "Suggested TRACK_EFF in", TRACK_GUESS_IN * 360.0 / turned);
+    }
+
+    /** Full power for 1.5 s. Reports peak velocity and time to 90% of it. */
+    void sprint() {
+        ElapsedTime t = new ElapsedTime();
+        double peak = 0, t90 = 0;
+        for (DcMotorEx m : left) m.setPower(1);
+        for (DcMotorEx m : right) m.setPower(1);
+        double[] v = new double[200]; double[] ts = new double[200]; int n = 0;
+        while (opModeIsActive() && t.seconds() < 1.5 && n < 200) {
+            double s = 0; for (DcMotorEx m : left) s += m.getVelocity(); for (DcMotorEx m : right) s += m.getVelocity();
+            v[n] = s / (left.length + right.length) / TICKS_PER_IN; ts[n] = t.seconds();
+            peak = Math.max(peak, v[n]); n++;
+            sleep(5);
+        }
+        for (DcMotorEx m : left) m.setPower(0);
+        for (DcMotorEx m : right) m.setPower(0);
+        for (int i = 0; i < n; i++) if (v[i] >= 0.9 * peak) { t90 = ts[i]; break; }
+        report("Peak velocity in/s", peak, "Approx accel in/s^2", t90 > 0 ? 0.9 * peak / t90 : 0);
+    }
+
+    void report(String a, double av, String b, double bv) {
+        while (opModeIsActive() && !gamepad1.y) {
+            telemetry.addData(a, "%.2f", av);
+            telemetry.addData(b, "%.3f", bv);
+            telemetry.addLine("Write these down, press Y to continue");
+            telemetry.update();
+            idle();
+        }
+    }
+}
+`;
+  }
+
+  return { FIELD, HALF, DEFAULT_ROBOT, vFree, vMax, trap, norm, fwd, corners, simulate, poseAt, monteCarlo, checks, score, javaAuto, javaCalibration };
+})();
+if (typeof module !== "undefined") module.exports = CORE;
+
+</script>
+<script>
+(() => {
+  const C = CORE, $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // ---------- state ----------
+  const DEFAULT_FIELD = () => ([
+    { id: "hive", label: "HIVE frame", x: 0, y: 0, w: 49.46, h: 38.95, kind: "hive" },
+    { id: "loadR", label: "Red loading zone", x: -66.5, y: -46.5, w: 11, h: 23, kind: "red" },
+    { id: "loadB", label: "Blue loading zone", x: 66.5, y: -46.5, w: 11, h: 23, kind: "blue" },
+    { id: "gardenR", label: "Red GARDEN", x: -60.5, y: 71, w: 23, h: 2, kind: "red" },
+    { id: "gardenB", label: "Blue GARDEN", x: 60.5, y: -71, w: 23, h: 2, kind: "blue" },
+    { id: "fl1", label: "FLOWER 1", x: -36, y: 70, w: 4, h: 4, kind: "flower" },
+    { id: "fl2", label: "FLOWER 2", x: 36, y: 70, w: 4, h: 4, kind: "flower" },
+    { id: "fl3", label: "FLOWER 3", x: -36, y: -70, w: 4, h: 4, kind: "flower" },
+    { id: "fl4", label: "FLOWER 4", x: 36, y: -70, w: 4, h: 4, kind: "flower" },
+    { id: "park", label: "AUTO park target", x: 32, y: -42, w: 24, h: 24, kind: "park" },
+  ]);
+  const EXAMPLE = {
+    start: { x: 36, y: -60, h: 0 },
+    plan: [
+      { t: "drive", in: 24, p: 0.8, note: "leave start" },
+      { t: "turn", deg: 45, abs: true, p: 0.6, note: "face the HIVE" },
+      { t: "drive", in: 6, p: 0.6 },
+      { t: "launch", n: 4, note: "preloaded POLLEN" },
+      { t: "turn", deg: 0, abs: true, p: 0.6 },
+      { t: "square", dir: "rev", p: 0.35, ms: 2000, note: "back into audience wall to reset heading" },
+      { t: "drive", in: 20, p: 0.7, note: "park" },
+    ],
+  };
+  const load = () => { try { return JSON.parse(localStorage.getItem("autolab.v1") || "null"); } catch (e) { return null; } };
+  const saved = load();
+  let robot = { ...C.DEFAULT_ROBOT, ...(saved?.robot || {}) };
+  let start = saved?.start || { ...EXAMPLE.start };
+  let plan = saved?.plan || EXAMPLE.plan.map(s => ({ ...s }));
+  let field = saved?.field || DEFAULT_FIELD();
+  const save = () => { try { localStorage.setItem("autolab.v1", JSON.stringify({ robot, start, plan, field })); } catch (e) {} };
+
+  let sim, mc, T = 0, playing = false, tNow = 0, lastTs = 0, activeStep = -1, bgImg = null;
+
+  // ---------- canvas ----------
+  const cv = $("#field"), ctx = cv.getContext("2d");
+  function resize() { const w = cv.clientWidth, d = window.devicePixelRatio || 1; cv.width = Math.round(w * d); cv.height = Math.round(w * d); draw(); }
+  const S = () => cv.width / C.FIELD;                       // px per inch
+  const P = (x, y) => [(x + C.HALF) * S(), (C.HALF - y) * S()];
+  const toField = (px, py) => { const r = cv.getBoundingClientRect(), k = C.FIELD / r.width; return [(px - r.left) * k - C.HALF, C.HALF - (py - r.top) * k]; };
+
+  function zones() { const z = {}; for (const e of field) { if (e.id === "hive") z.hive = e; if (e.id === "park") z.park = e; } return z; }
+
+  function rectPath(e) { const [x, y] = P(e.x - e.w / 2, e.y + e.h / 2); ctx.beginPath(); ctx.rect(x, y, e.w * S(), e.h * S()); }
+  function robotPath(p) { const c = C.corners(p, robot); ctx.beginPath(); c.forEach(([x, y], i) => { const [a, b] = P(x, y); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.closePath(); }
+
+  function draw() {
+    if (!sim) return;
+    const W = cv.width, s = S();
+    ctx.clearRect(0, 0, W, W);
+    // tiles
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { ctx.fillStyle = (i + j) % 2 ? css("--mat") : css("--mat2"); ctx.fillRect(i * 24 * s, j * 24 * s, 24 * s, 24 * s); }
+    if (bgImg) { ctx.globalAlpha = +$("#bgop").value / 100; ctx.drawImage(bgImg, 0, 0, W, W); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = "rgba(255,255,255,.12)"; ctx.lineWidth = 1;
+    for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(k * 24 * s, 0); ctx.lineTo(k * 24 * s, W); ctx.moveTo(0, k * 24 * s); ctx.lineTo(W, k * 24 * s); ctx.stroke(); }
+    // alliance walls (red left, blue right) and audience edge
+    ctx.fillStyle = css("--red"); ctx.fillRect(0, 0, 0.9 * s, W);
+    ctx.fillStyle = css("--blue"); ctx.fillRect(W - 0.9 * s, 0, 0.9 * s, W);
+    ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.font = `600 ${Math.max(10, 2.4 * s)}px ${css("--display")}`; ctx.textAlign = "center";
+    ctx.fillText("AUDIENCE", W / 2, W - 1.2 * s);
+    // field elements
+    for (const e of field) {
+      const col = e.kind === "red" ? css("--red") : e.kind === "blue" ? css("--blue") : e.kind === "park" ? css("--honey") : e.kind === "flower" ? "#e9d34a" : "#2b2d31";
+      rectPath(e);
+      if (e.kind === "hive") { ctx.fillStyle = "rgba(20,20,22,.55)"; ctx.fill(); ctx.strokeStyle = css("--honey"); ctx.lineWidth = 2; ctx.stroke(); }
+      else if (e.kind === "park") { ctx.setLineDash([6, 5]); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); }
+      else if (e.kind === "flower") { const [cx, cy] = P(e.x, e.y); ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, e.w / 2 * s), 0, 7); ctx.fillStyle = col; ctx.fill(); }
+      else { ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke(); }
+      if (e.kind === "hive" || e.kind === "park") { const [cx, cy] = P(e.x, e.y); ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = `600 ${Math.max(10, 2.2 * s)}px ${css("--display")}`; ctx.fillText(e.kind === "hive" ? "HIVE" : "PARK", cx, cy + 4); }
+    }
+    // drift cloud
+    if ($("#ghosts").checked && mc) {
+      ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.18; ctx.lineWidth = 1;
+      for (const e of mc.ends) { robotPath(e); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      const [cx, cy] = P(sim.end.x, sim.end.y); ctx.beginPath(); ctx.arc(cx, cy, mc.r95 * s, 0, 7); ctx.strokeStyle = css("--warn"); ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // planned path
+    ctx.strokeStyle = css("--honey"); ctx.lineWidth = Math.max(2, 0.45 * s); ctx.lineJoin = "round"; ctx.beginPath();
+    for (let tt = 0; tt <= T + 1e-6; tt += Math.max(0.02, T / 600)) { const p = C.poseAt(sim, tt, start), [a, b] = P(p.x, p.y); tt ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
+    ctx.stroke();
+    // step markers
+    ctx.font = `500 ${Math.max(9, 1.8 * s)}px ${css("--mono")}`;
+    sim.segs.forEach(g => { const p = g.pose(0), [a, b] = P(p.x, p.y); ctx.beginPath(); ctx.arc(a, b, Math.max(3, 0.7 * s), 0, 7); ctx.fillStyle = g.i === activeStep ? css("--ink") : css("--honey"); ctx.fill(); });
+    // start ghost + current robot
+    ctx.globalAlpha = 0.35; robotPath(start); ctx.strokeStyle = "#fff"; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const p = C.poseAt(sim, tNow, start);
+    robotPath(p); ctx.fillStyle = "rgba(42,91,196,.85)"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+    const [fx, fy] = C.fwd(p.h), [a, b] = P(p.x, p.y), [a2, b2] = P(p.x + fx * robot.lengthIn * 0.5, p.y + fy * robot.lengthIn * 0.5);
+    ctx.strokeStyle = css("--honey"); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a2, b2); ctx.stroke();
+  }
+
+  // ---------- recompute ----------
+  function recompute(keepTime) {
+    sim = C.simulate(plan, robot, start, null); T = sim.T; mc = C.monteCarlo(plan, robot, start);
+    if (!keepTime) tNow = Math.min(tNow, T);
+    const sc = C.score(sim, robot, start, zones()), warns = C.checks(sim, robot, start, zones());
+    const st = (id, v, cls) => { const el = $(id); el.querySelector("b").textContent = v; el.classList.remove("ok", "over"); if (cls) el.classList.add(cls); };
+    st("#st-time", `${T.toFixed(1)} s`, T > 30 ? "over" : "ok");
+    st("#st-pts", `${sc.pts}`, null);
+    $("#st-pts").title = `LEAVE ${sc.leave ? 3 : 0} + PARK ${sc.park ? 5 : 0} + ${sc.launched} launched × 2 (assumes every piece stays in a CELL)`;
+    st("#st-r95", `±${mc.r95.toFixed(1)} in`, mc.r95 > 6 ? "over" : null);
+    st("#st-head", `±${mc.sh.toFixed(1)}°`, null);
+    const w = $("#warns"); w.innerHTML = ""; warns.forEach(t => { const li = document.createElement("li"); li.textContent = t; w.appendChild(li); });
+    if (!sc.park && zones().park) { const li = document.createElement("li"); li.textContent = "Robot doesn't end fully inside the park target. Move the target in the Field tab to wherever AUTO PARK counts."; w.appendChild(li); }
+    buildTimeline(); renderExport(); save(); draw(); syncScrub();
+  }
+
+  const KCOL = { drive: "--honey", turn: "--blue", square: "--warn", launch: "--good", wait: "--muted", intake: "--muted" };
+  function buildTimeline() {
+    const tl = $("#timeline"), span = Math.max(30, T) * 1.02; tl.innerHTML = "";
+    sim.segs.forEach(g => { if (!g.T) return; const d = document.createElement("div"); d.className = "seg"; d.style.left = (g.t0 / span * 100) + "%"; d.style.width = (g.T / span * 100) + "%"; d.style.background = `var(${KCOL[g.kind]})`; d.style.opacity = g.i === activeStep ? 1 : .55; d.title = `Step ${g.i + 1}: ${g.kind} ${g.T.toFixed(2)} s`; tl.appendChild(d); });
+    const lim = document.createElement("div"); lim.className = "limit"; lim.style.left = (30 / span * 100) + "%"; lim.title = "30 s AUTO limit"; tl.appendChild(lim);
+    const h = document.createElement("div"); h.className = "head"; h.id = "tlhead"; tl.appendChild(h);
+    syncScrub();
+  }
+  function syncScrub() { const span = Math.max(30, T) * 1.02, h = $("#tlhead"); if (h) h.style.left = (tNow / span * 100) + "%"; $("#scrub").value = T ? Math.round(tNow / T * 1000) : 0;
+    const seg = sim.segs.find(g => tNow >= g.t0 && tNow <= g.t0 + g.T); const idx = seg ? seg.i : -1;
+    if (idx !== activeStep && playing) { activeStep = idx; $$(".step").forEach((el, i) => el.classList.toggle("active", i === idx)); } }
+
+  // ---------- steps UI ----------
+  const TYPES = { drive: "Drive", turn: "Turn", square: "Square", launch: "Launch", intake: "Intake", wait: "Wait" };
+  const NEW = { drive: { t: "drive", in: 24, p: 0.8 }, turn: { t: "turn", deg: 90, abs: true, p: 0.6 }, square: { t: "square", dir: "rev", p: 0.3, ms: 900 }, launch: { t: "launch", n: 4 }, intake: { t: "intake", on: true }, wait: { t: "wait", ms: 500 } };
+  function num(label, val, key, i, step = 1, min, max) {
+    return `<label>${label}<input type="number" id="s${i}-${key}" data-i="${i}" data-k="${key}" value="${val}" step="${step}"${min != null ? ` min="${min}"` : ""}${max != null ? ` max="${max}"` : ""}></label>`;
+  }
+  function renderSteps() {
+    const ol = $("#steps"); ol.innerHTML = "";
+    plan.forEach((s, i) => {
+      const li = document.createElement("li"); li.className = "step" + (i === activeStep ? " active" : ""); li.dataset.i = i;
+      let params = "";
+      if (s.t === "drive") params = num("in", s.in, "in", i, 0.5) + num("power", s.p, "p", i, 0.05, 0.05, 1);
+      if (s.t === "turn") params = num("°", s.deg, "deg", i, 1, -180, 180) + `<label><select id="s${i}-abs" data-i="${i}" data-k="abs"><option value="1"${s.abs ? " selected" : ""}>to heading</option><option value="0"${!s.abs ? " selected" : ""}>by angle</option></select></label>` + num("power", s.p, "p", i, 0.05, 0.05, 1);
+      if (s.t === "square") params = `<label><select id="s${i}-dir" data-i="${i}" data-k="dir"><option value="rev"${s.dir !== "fwd" ? " selected" : ""}>reverse</option><option value="fwd"${s.dir === "fwd" ? " selected" : ""}>forward</option></select></label>` + num("power", s.p, "p", i, 0.05, 0.05, 1) + num("ms", s.ms, "ms", i, 50, 0);
+      if (s.t === "launch") params = num("pieces", s.n, "n", i, 1, 0, 4);
+      if (s.t === "intake") params = `<label><select id="s${i}-on" data-i="${i}" data-k="on"><option value="1"${s.on ? " selected" : ""}>on</option><option value="0"${!s.on ? " selected" : ""}>off</option></select></label>`;
+      if (s.t === "wait") params = num("ms", s.ms, "ms", i, 50, 0);
+      const g = sim && sim.segs.find(x => x.i === i);
+      li.innerHTML = `<span class="n">${i + 1}</span><strong style="font-family:var(--display);font-size:15px;letter-spacing:.03em">${TYPES[s.t]}</strong><span class="params">${params}</span>
+        <span class="ops"><button type="button" data-op="up" aria-label="Move step ${i + 1} up">↑</button><button type="button" data-op="down" aria-label="Move step ${i + 1} down">↓</button><button type="button" data-op="del" aria-label="Delete step ${i + 1}">✕</button></span>
+        <span class="t">${g ? `t = ${g.t0.toFixed(2)} → ${(g.t0 + g.T).toFixed(2)} s` : ""}${g && g.kind === "square" ? (g.snap ? " · touches wall, heading reset" : " · does not reach a wall") : ""}${s.note ? " · " + escapeHtml(s.note) : ""}</span>`;
+      ol.appendChild(li);
+    });
+  }
+  const escapeHtml = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  $("#steps").addEventListener("change", e => {
+    const el = e.target, i = +el.dataset.i, k = el.dataset.k; if (!k) return;
+    if (k === "abs" || k === "on") plan[i][k] = el.value === "1"; else if (k === "dir") plan[i][k] = el.value; else plan[i][k] = +el.value;
+    recompute(true); renderSteps();
+  });
+  $("#steps").addEventListener("click", e => {
+    const b = e.target.closest("button[data-op]"), li = e.target.closest(".step"); if (!li) return; const i = +li.dataset.i;
+    if (b) { const op = b.dataset.op;
+      if (op === "del") plan.splice(i, 1);
+      if (op === "up" && i > 0) [plan[i - 1], plan[i]] = [plan[i], plan[i - 1]];
+      if (op === "down" && i < plan.length - 1) [plan[i + 1], plan[i]] = [plan[i], plan[i + 1]];
+      recompute(true); renderSteps(); return; }
+    if (e.target.matches("input,select")) return;
+    activeStep = i; const g = sim.segs.find(x => x.i === i); if (g) tNow = g.t0 + g.T; renderSteps(); buildTimeline(); draw();
+  });
+  $$("[data-add]").forEach(b => b.addEventListener("click", () => { plan.push({ ...NEW[b.dataset.add] }); recompute(true); renderSteps(); }));
+
+  // ---------- start pose ----------
+  function syncStart() { $("#sx").value = start.x; $("#sy").value = start.y; $("#sh").value = start.h; }
+  ["#sx", "#sy", "#sh"].forEach(id => $(id).addEventListener("change", () => { start = { x: +$("#sx").value, y: +$("#sy").value, h: +$("#sh").value }; recompute(); renderSteps(); }));
+
+  // ---------- dragging ----------
+  let drag = null;
+  cv.addEventListener("pointerdown", e => {
+    const [x, y] = toField(e.clientX, e.clientY);
+    if ($("#editField").checked) {
+      const hit = [...field].reverse().find(f => Math.abs(x - f.x) <= Math.max(3, f.w / 2) && Math.abs(y - f.y) <= Math.max(3, f.h / 2));
+      if (hit) drag = { kind: "field", el: hit, dx: x - hit.x, dy: y - hit.y };
+    } else if (Math.hypot(x - start.x, y - start.y) < 14) drag = { kind: "start", dx: x - start.x, dy: y - start.y };
+    if (drag) { cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; }
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!drag) return; const [x, y] = toField(e.clientX, e.clientY);
+    if (drag.kind === "start") { let nx = x - drag.dx, ny = y - drag.dy; if ($("#snap").value === "1") { nx = Math.round((nx - 12) / 24) * 24 + 12; ny = Math.round((ny - 12) / 24) * 24 + 12; }
+      start.x = Math.max(-60, Math.min(60, nx)); start.y = Math.max(-60, Math.min(60, ny)); syncStart(); tNow = 0; recompute(); }
+    else { drag.el.x = Math.round((x - drag.dx) * 2) / 2; drag.el.y = Math.round((y - drag.dy) * 2) / 2; renderFieldList(); recompute(true); }
+  });
+  const endDrag = () => { if (drag) { drag = null; cv.style.cursor = "grab"; renderSteps(); } };
+  cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+
+  // ---------- playback ----------
+  function tick(ts) { if (!playing) return; const dt = (ts - lastTs) / 1000 * +$("#speed").value; lastTs = ts; tNow += dt;
+    if (tNow >= T) { tNow = T; playing = false; $("#play").textContent = "Replay"; }
+    syncScrub(); draw(); if (playing) requestAnimationFrame(tick); }
+  $("#play").addEventListener("click", () => { if (playing) { playing = false; $("#play").textContent = "Play"; return; }
+    if (tNow >= T) tNow = 0; playing = true; $("#play").textContent = "Pause"; lastTs = performance.now(); requestAnimationFrame(tick); });
+  $("#scrub").addEventListener("input", e => { tNow = T * e.target.value / 1000; playing = false; $("#play").textContent = "Play"; syncScrub(); draw(); });
+  $("#ghosts").addEventListener("change", draw);
+
+  // ---------- tabs ----------
+  $$(".tabs button").forEach(b => b.addEventListener("click", () => {
+    $$(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+    $$(".pane").forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+  }));
+
+  // ---------- robot panel ----------
+  const RFIELDS = [
+    ["wheelDiaIn", "Wheel diameter (in)", 0.001], ["motorRpm", "Motor free speed (RPM)", 1], ["ticksPerRev", "Encoder ticks / motor rev", 0.1], ["gearRatio", "Wheel turns per motor turn", 0.01],
+    ["efficiency", "Speed efficiency (0–1) ★", 0.01], ["maxAccel", "Max accel (in/s²) ★", 1], ["trackEff", "Effective track width (in) ★", 0.1], ["distScale", "Distance scale ★", 0.001],
+    ["lengthIn", "Robot length (in)", 0.1], ["widthIn", "Robot width (in)", 0.1], ["launchSpinupS", "Launcher spin-up (s)", 0.05], ["launchPerPieceS", "Time per launched piece (s)", 0.05],
+    ["distErrPct", "Distance error, 1σ (%) ★", 0.1], ["driftDegPerIn", "Heading drift, 1σ (°/in) ★", 0.005], ["turnErrDeg", "Turn error, 1σ (°) ★", 0.1],
+    ["leftNames", "Left motor names (comma-separated)", "text"], ["rightNames", "Right motor names (comma-separated)", "text"],
+  ];
+  function renderRobot() {
+    const g = $("#robotGrid"); g.innerHTML = "";
+    for (const [k, label, step] of RFIELDS) {
+      const l = document.createElement("label"); if (step === "text") l.className = "full";
+      l.innerHTML = `${label}<input id="r-${k}" type="${step === "text" ? "text" : "number"}" ${step !== "text" ? `step="${step}"` : ""} value="${robot[k]}">`;
+      l.querySelector("input").addEventListener("change", ev => { robot[k] = step === "text" ? ev.target.value : +ev.target.value; derived(); recompute(true); renderSteps(); });
+      g.appendChild(l);
+    }
+    const sel = (k, label, opts) => { const l = document.createElement("label"); l.innerHTML = `${label}<select id="r-${k}">${opts.map(o => `<option${String(robot[k]) === String(o) ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+      l.querySelector("select").addEventListener("change", ev => { robot[k] = ev.target.value === "true" ? true : ev.target.value === "false" ? false : ev.target.value; recompute(true); renderSteps(); }); g.appendChild(l); };
+    sel("leftReversed", "Reverse left side", [true, false]); sel("turnByImu", "Turns use IMU", [true, false]);
+    sel("hubLogo", "Control Hub logo faces", ["UP", "DOWN", "FORWARD", "BACKWARD", "LEFT", "RIGHT"]); sel("hubUsb", "Control Hub USB faces", ["FORWARD", "BACKWARD", "LEFT", "RIGHT", "UP", "DOWN"]);
+    derived();
+  }
+  function derived() { $("#robotDerived").textContent = `Free speed ${C.vFree(robot).toFixed(1)} in/s · planned top speed ${C.vMax(robot).toFixed(1)} in/s · ${(robot.ticksPerRev / (robot.gearRatio * Math.PI * robot.wheelDiaIn) * robot.distScale).toFixed(2)} ticks/in`; }
+
+  // ---------- field panel ----------
+  function renderFieldList() {
+    const box = $("#fieldList"); box.innerHTML = "";
+    field.forEach((f, idx) => {
+      const row = document.createElement("div"); row.className = "fieldrow";
+      row.innerHTML = `<span>${f.label}</span>` + ["x", "y", "w", "h"].map(k => `<input type="number" step="0.5" id="f${idx}-${k}" aria-label="${f.label} ${k}" value="${+f[k].toFixed(2)}" data-k="${k}">`).join("");
+      row.addEventListener("change", e => { f[e.target.dataset.k] = +e.target.value; recompute(true); });
+      box.appendChild(row);
+    });
+  }
+  $("#resetField").addEventListener("click", () => { field = DEFAULT_FIELD(); renderFieldList(); recompute(true); });
+  $("#bgfile").addEventListener("change", e => { const file = e.target.files[0]; if (!file) return; const rd = new FileReader();
+    rd.onload = () => { const im = new Image(); im.onload = () => { bgImg = im; draw(); }; im.src = rd.result; }; rd.readAsDataURL(file); });
+  $("#bgop").addEventListener("input", draw);
+  $("#editField").addEventListener("change", e => { cv.style.cursor = "grab"; });
+
+  // ---------- calibration ----------
+  $("#applyCal").addEventListener("click", () => {
+    const v = id => { const x = parseFloat($(id).value); return isFinite(x) ? x : null; }, msg = [];
+    const enc = v("#c-enc"), tape = v("#c-tape"), drift = v("#c-drift"), tr = v("#c-track"), vel = v("#c-vel"), acc = v("#c-acc"), r95 = v("#c-r95");
+    if (enc && tape) { robot.distScale = +(enc / tape).toFixed(4); msg.push(`distance scale ${robot.distScale}`); }
+    if (drift != null) { robot.driftDegPerIn = +Math.max(0.002, Math.abs(drift) / 72 * 0.35).toFixed(4); msg.push(`drift ${robot.driftDegPerIn}°/in (heading hold removes ~65%)`); }
+    if (tr) { robot.trackEff = +tr.toFixed(2); msg.push(`track ${robot.trackEff} in`); }
+    if (vel) { robot.efficiency = +Math.min(1, vel / C.vFree(robot)).toFixed(3); msg.push(`efficiency ${robot.efficiency}`); }
+    if (acc) { robot.maxAccel = +(acc * 0.8).toFixed(0); msg.push(`accel ${robot.maxAccel} in/s² (80% of peak)`); }
+    if (r95) { for (let k = 0; k < 4; k++) { const cur = C.monteCarlo(plan, robot, start).r95; if (cur < 0.05) break; const f = r95 / cur;
+        robot.distErrPct *= f; robot.driftDegPerIn *= f; robot.turnErrDeg *= f; }
+      msg.push(`error model scaled to ±${C.monteCarlo(plan, robot, start).r95.toFixed(1)} in`); }
+    $("#calMsg").textContent = msg.length ? "Applied: " + msg.join(", ") : "Enter at least one measurement.";
+    renderRobot(); recompute(true); renderSteps();
+  });
+
+  // ---------- export ----------
+  function renderExport() {
+    $("#javaAuto").textContent = C.javaAuto(plan, robot, start);
+    $("#javaCal").textContent = C.javaCalibration(robot);
+    $("#planJson").textContent = JSON.stringify({ start, plan, robot, field }, null, 1);
+  }
+  $$("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+    const el = $("#" + b.dataset.copy), txt = el.textContent;
+    try { await navigator.clipboard.writeText(txt); $("#copyMsg").textContent = "Copied."; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $("#copyMsg").textContent = "Selected. Press Ctrl/Cmd+C to copy."; }
+    b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1500);
+  }));
+  $("#importBtn").addEventListener("click", () => {
+    try { const o = JSON.parse($("#importBox").value); if (!Array.isArray(o.plan)) throw new Error("no plan");
+      plan = o.plan; if (o.start) start = o.start; if (o.robot) robot = { ...C.DEFAULT_ROBOT, ...o.robot }; if (o.field) field = o.field;
+      syncStart(); renderRobot(); renderFieldList(); recompute(); renderSteps(); $("#copyMsg").textContent = "Plan loaded."; }
+    catch (e) { $("#copyMsg").textContent = "That isn't a plan file. Copy one from the Plan file box above."; }
+  });
+
+  // ---------- boot ----------
+  syncStart(); renderRobot(); renderFieldList();
+  sim = C.simulate(plan, robot, start, null); recompute(); renderSteps();
+  tNow = T; resize(); window.addEventListener("resize", resize);
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  document.fonts?.ready.then(draw);
+})();
+</script>
